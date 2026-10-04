@@ -1,6 +1,7 @@
 using Npgsql;
 using SwiftBets.BuildingBlocks.Testing;
 using SwiftBets.Steward.Domain.Incidents;
+using SwiftBets.Steward.Domain.Status;
 using SwiftBets.Steward.Infrastructure.Persistence;
 using SwiftBets.Steward.Infrastructure.Runbooks;
 
@@ -96,6 +97,34 @@ public sealed class StewardPostgresTests(PostgresFixture postgres)
         var store = new PgvectorRunbookStore(await DataSourceAsync(), new HashingEmbeddingGenerator(), minimumSimilarity: 0.99);
         await store.IngestAsync(RunbookLibrary.Load(), TestContext.Current.CancellationToken);
         return store;
+    }
+
+    [Fact]
+    public async Task Status_incident_keeps_its_updates_and_shows_until_a_week_after_it_resolves()
+    {
+        var store = new PostgresStatusStore(await DataSourceAsync());
+        var now = DateTimeOffset.UtcNow;
+        var incident = new StatusIncident(Guid.NewGuid(), "Slow deposits", "minor", "investigating", ["payments"], now, now, null, "ops1", [new StatusIncidentUpdate("investigating", "Looking.", now)]);
+        await store.CreateAsync(incident, TestContext.Current.CancellationToken);
+
+        (await store.AddUpdateAsync(incident.Id, new StatusIncidentUpdate("resolved", "Fixed.", now.AddMinutes(5)), "ops1", TestContext.Current.CancellationToken)).ShouldBeTrue();
+        var listed = (await store.ListAsync(now.AddDays(-7), true, TestContext.Current.CancellationToken)).Single();
+
+        listed.Status.ShouldBe("resolved");
+        listed.Updates.Select(u => u.Message).ShouldBe(["Fixed.", "Looking."]);
+    }
+
+    [Fact]
+    public async Task Status_incident_resolved_over_a_week_ago_leaves_the_page_and_takes_no_update()
+    {
+        var store = new PostgresStatusStore(await DataSourceAsync());
+        var old = DateTimeOffset.UtcNow.AddDays(-10);
+        var incident = new StatusIncident(Guid.NewGuid(), "Old", "minor", "investigating", ["sports"], old, old, null, "ops1", [new StatusIncidentUpdate("investigating", "Old.", old)]);
+        await store.CreateAsync(incident, TestContext.Current.CancellationToken);
+        await store.AddUpdateAsync(incident.Id, new StatusIncidentUpdate("resolved", "Done.", old.AddHours(1)), "ops1", TestContext.Current.CancellationToken);
+
+        (await store.ListAsync(DateTimeOffset.UtcNow.AddDays(-7), true, TestContext.Current.CancellationToken)).ShouldBeEmpty();
+        (await store.AddUpdateAsync(incident.Id, new StatusIncidentUpdate("monitoring", "Again.", DateTimeOffset.UtcNow), "ops1", TestContext.Current.CancellationToken)).ShouldBeFalse();
     }
 
     private async Task<NpgsqlDataSource> DataSourceAsync()

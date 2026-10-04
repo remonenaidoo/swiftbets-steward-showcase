@@ -1,4 +1,12 @@
 using System.Net;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -57,8 +65,48 @@ public sealed class HostTests : IClassFixture<HostTests.Factory>
         response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task Status_incidents_refuse_staff_without_the_status_permission()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/status/incidents", UriKind.Relative));
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Factory.Token("reports.read"));
+
+        using var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Status_incidents_pass_authorisation_with_the_status_permission()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/status/incidents", UriKind.Relative));
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Factory.Token("status.write"));
+
+        using var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // No database in this host, so the store fails after authorisation let the call through.
+        response.StatusCode.ShouldNotBeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
     public sealed class Factory : WebApplicationFactory<Program>
     {
+        private const string Issuer = "https://identity.test";
+        private static readonly RsaSecurityKey Key = new(RSA.Create(2048)) { KeyId = "steward.test" };
+
+        public static string Token(params string[] permissions)
+        {
+            var claims = new List<Claim> { new(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()) };
+            claims.AddRange(permissions.Select(p => new Claim("perm", p)));
+            return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+            {
+                Issuer = Issuer,
+                Audience = "swiftbets",
+                Subject = new ClaimsIdentity(claims),
+                Expires = DateTime.UtcNow.AddMinutes(10),
+                SigningCredentials = new SigningCredentials(Key, SecurityAlgorithms.RsaSha256),
+            });
+        }
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
         builder.UseSetting("ConnectionStrings:SbSteward", "Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=1");
@@ -74,6 +122,15 @@ public sealed class HostTests : IClassFixture<HostTests.Factory>
             builder.UseSetting("Platform:OfferAddress", "http://127.0.0.1:1");
             builder.UseSetting("Platform:WalletAddress", "http://127.0.0.1:1");
             builder.UseSetting("Platform:PrometheusAddress", "http://127.0.0.1:1");
+            builder.ConfigureServices(services => services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, options =>
+            {
+                var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
+                configuration.SigningKeys.Add(Key);
+                options.Configuration = configuration;
+                options.ConfigurationManager = new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
+                options.TokenValidationParameters.ValidIssuer = Issuer;
+                options.TokenValidationParameters.ValidAudience = "swiftbets";
+            }));
         }
     }
 }

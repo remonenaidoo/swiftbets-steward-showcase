@@ -13,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddSwiftBetsObservability("swiftbets-steward");
 builder.Services.AddSwiftBetsWeb();
 builder.Services.AddSwiftBetsJwtBearer(builder.Configuration);
+builder.Services.AddAuthorizationBuilder().AddPolicy(StatusEndpoints.Permission, p => p.RequireAssertion(c =>
+    c.User.IsInRole(Roles.Admin) || c.User.HasClaim("perm", StatusEndpoints.Permission)));
 builder.Services.AddStewardApplication();
 builder.Services.AddStewardInfrastructure(builder.Configuration);
 
@@ -24,6 +26,7 @@ app.UseAuthorization();
 app.MapSwiftBetsOperationalEndpoints();
 app.MapStewardEndpoints();
 app.MapAlertWebhook();
+app.MapStatusEndpoints();
 
 await app.RunAsync();
 return 0;

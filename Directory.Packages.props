@@ -12,7 +12,7 @@
     <PackageVersion Include="SwiftBets.BuildingBlocks.Observability" Version="0.5.0" />
     <PackageVersion Include="SwiftBets.BuildingBlocks.Persistence" Version="0.5.0" />
     <PackageVersion Include="SwiftBets.BuildingBlocks.Web" Version="0.5.0" />
-    <PackageVersion Include="SwiftBets.Contracts" Version="2.6.0" />
+    <PackageVersion Include="SwiftBets.Contracts" Version="2.8.0" />
     <PackageVersion Include="xunit.v3" Version="4.0.1" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Dapper" Version="2.1.89" />

@@ -21,6 +21,7 @@ using SwiftBets.Steward.Infrastructure.Model;
 using SwiftBets.Steward.Infrastructure.Persistence;
 using SwiftBets.Steward.Infrastructure.Platform;
 using SwiftBets.Steward.Infrastructure.Runbooks;
+using SwiftBets.Steward.Infrastructure.Status;
 using SwiftBets.Steward.Infrastructure.Workers;
 
 namespace SwiftBets.Steward.Infrastructure;
@@ -67,7 +68,19 @@ public static class InfrastructureRegistration
         }
 
         services.AddHostedService<HousekeepingWorker>();
+        AddStatusPage(services, configuration);
         return services;
+    }
+
+    private static void AddStatusPage(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddValidatedOptions<StatusOptions>(configuration, StatusOptions.SectionName);
+        services.AddSingleton<IStatusStore, PostgresStatusStore>();
+        services.AddSingleton<ComponentStatusBoard>();
+        services.AddSingleton<IComponentStatus>(sp => sp.GetRequiredService<ComponentStatusBoard>());
+        services.AddHttpClient(StatusPoller.ClientName, http => http.Timeout = TimeSpan.FromSeconds(5));
+        services.AddSingleton<StatusPoller>();
+        services.AddHostedService(sp => sp.GetRequiredService<StatusPoller>());
     }
 
     private static void AddLog<T>(IServiceCollection services, string topic, Func<T, string> key)
