@@ -1,6 +1,6 @@
 # swiftbets-steward
 
-[![ci](https://github.com/remonenaidoo/swiftbets-steward/actions/workflows/ci.yml/badge.svg)](https://github.com/remonenaidoo/swiftbets-steward/actions/workflows/ci.yml)
+[![ci](https://github.com/remonenaidoo/swiftbets-steward-showcase/actions/workflows/ci.yml/badge.svg)](https://github.com/remonenaidoo/swiftbets-steward-showcase/actions/workflows/ci.yml)
 
 Steward, the SwiftBets operations copilot: rule-based detectors over the event stream and metrics, a tool-calling agent that diagnoses incidents with evidence it must cite, hybrid runbook retrieval in pgvector, incident reports, and approval-gated remediation with an audit trail. Also orchestrates fault injection.
 
@@ -31,18 +31,15 @@ Every host exposes `/health/live`, `/health/ready` (checks its real dependencies
 ## Build and test
 
 ```bash
-../swiftbets-platform/scripts/fetch-shared-packages.sh .   # or pack-local.sh for unreleased shared changes
+scripts/fetch-shared-packages.sh .   # the shared packages, from public releases
 dotnet test SwiftBets.Steward.slnx
 ```
 
-Integration tests use Testcontainers and need Docker. The whole platform runs from `swiftbets-platform` with `make up`.
+Integration tests use Testcontainers and need Docker.
 
-## Images
+## Part of SwiftBets
 
-Multi-arch (amd64 + arm64), non-root, chiseled runtime:
-
-- `ghcr.io/remonenaidoo/swiftbets-steward`
-- `ghcr.io/remonenaidoo/swiftbets-steward-migrator`
+SwiftBets is a sportsbook and casino platform built as independent .NET services. It runs live at [swiftbets.remonenaidoo.com](https://swiftbets.remonenaidoo.com). These repositories show a selection of it: [Settlement](https://github.com/remonenaidoo/swiftbets-settlement-showcase) · [Wallet](https://github.com/remonenaidoo/swiftbets-wallet-showcase) · [Originals](https://github.com/remonenaidoo/swiftbets-originals-showcase) · [Building blocks](https://github.com/remonenaidoo/swiftbets-building-blocks-showcase) · [Contracts](https://github.com/remonenaidoo/swiftbets-contracts-showcase).
 
 ## License
 
